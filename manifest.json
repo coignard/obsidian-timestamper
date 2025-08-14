@@ -1,0 +1,13 @@
+{
+    "id": "timestamper",
+    "name": "Timestamper",
+    "version": "1.0.0",
+    "minAppVersion": "1.18.10",
+    "description": "Insert the current timestamp into your notes.",
+    "author": "René Coignard",
+    "authorUrl": "https://github.com/coignard",
+    "isDesktopOnly": false,
+    "fundingUrl": {
+        "Ko-fi": "https://ko-fi.com/coignard"
+    }
+}
