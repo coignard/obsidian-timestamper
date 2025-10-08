@@ -186,8 +186,8 @@ module.exports = class TimestamperPlugin extends Plugin {
         const totalLines = editor.lineCount();
         const timestampPattern = this.settings.timestampFormat
             .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            .replace('HH', '\\d{2}')
-            .replace('MM', '\\d{2}');
+            .replace(/HH/g, '\\d{2}')
+            .replace(/MM/g, '\\d{2}');
         const regex = new RegExp('^' + timestampPattern);
 
         let lastTimestampLine = -1;
@@ -247,8 +247,8 @@ module.exports = class TimestamperPlugin extends Plugin {
         const minutes = String(currentTime.getMinutes()).padStart(2, '0');
 
         const formattedTimestamp = this.settings.timestampFormat
-            .replace('HH', hours)
-            .replace('MM', minutes);
+            .replace(/HH/g, hours)
+            .replace(/MM/g, minutes);
 
         if (this.settings.chainMode) {
             this.insertTimestampChain(editor, formattedTimestamp);
@@ -336,34 +336,6 @@ class TimestamperSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Scroll to bottom')
-            .setDesc('Automatically scroll to the bottom of the note after inserting a timestamp.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.scrollToBottom)
-                .onChange(async (value) => {
-                    if (value) {
-                        this.plugin.settings.chainMode = false;
-                    }
-                    this.plugin.settings.scrollToBottom = value;
-                    await this.plugin.saveSettings();
-                    this.display();
-                }));
-
-        new Setting(containerEl)
-            .setName('Insert at document end')
-            .setDesc('Insert timestamp at the end of the document. When disabled, inserts at the first empty line below the cursor.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.insertAtEnd)
-                .onChange(async (value) => {
-                    if (value) {
-                        this.plugin.settings.chainMode = false;
-                    }
-                    this.plugin.settings.insertAtEnd = value;
-                    await this.plugin.saveSettings();
-                    this.display();
-                }));
-
-        new Setting(containerEl)
             .setName('Chain mode')
             .setDesc('Insert timestamp after the last timestamp and its content, before separators.')
             .addToggle(toggle => toggle
@@ -378,9 +350,31 @@ class TimestamperSettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
+        if (!this.plugin.settings.chainMode) {
+            new Setting(containerEl)
+                .setName('Scroll to bottom')
+                .setDesc('Automatically scroll to the bottom of the note after inserting a timestamp.')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.scrollToBottom)
+                    .onChange(async (value) => {
+                        this.plugin.settings.scrollToBottom = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Insert at document end')
+                .setDesc('Insert timestamp at the end of the document. When disabled, inserts at the first empty line below the cursor.')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.insertAtEnd)
+                    .onChange(async (value) => {
+                        this.plugin.settings.insertAtEnd = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
+
         new Setting(containerEl)
             .setName('Timestamp format')
-            .setDesc('Format for the timestamp.')
+            .setDesc('Format for the timestamp. Use HH for hours and MM for minutes.')
             .addText(text => text
                 .setPlaceholder('# HH:MM')
                 .setValue(this.plugin.settings.timestampFormat)
@@ -389,15 +383,17 @@ class TimestamperSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        new Setting(containerEl)
-            .setName('Separators')
-            .setDesc('Comma-separated list of line prefixes that mark the end of content.')
-            .addText(text => text
-                .setPlaceholder('---,%%')
-                .setValue(this.plugin.settings.separators)
-                .onChange(async (value) => {
-                    this.plugin.settings.separators = value;
-                    await this.plugin.saveSettings();
-                }));
+        if (this.plugin.settings.chainMode) {
+            new Setting(containerEl)
+                .setName('Separators')
+                .setDesc('Comma-separated list of line prefixes that mark the end of content.')
+                .addText(text => text
+                    .setPlaceholder('---,%%')
+                    .setValue(this.plugin.settings.separators)
+                    .onChange(async (value) => {
+                        this.plugin.settings.separators = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
     }
 }
