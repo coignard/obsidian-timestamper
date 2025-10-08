@@ -35,8 +35,15 @@ module.exports = class TimestamperPlugin extends Plugin {
     scrollToBottom(editor) {
         if (!editor || !this.settings.scrollToBottom) return;
 
-        const cursorPos = editor.getCursor();
-        editor.scrollIntoView(cursorPos);
+        const lastLine = editor.lineCount() - 1;
+        const lastChar = editor.getLine(lastLine).length;
+        editor.setCursor({ line: lastLine, ch: lastChar });
+
+        const codemirror = editor.cm;
+        if (codemirror && codemirror.scrollDOM) {
+            const scrollContainer = codemirror.scrollDOM;
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
     }
 
     getDailyNoteConfiguration() {
