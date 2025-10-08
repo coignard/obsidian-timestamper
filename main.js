@@ -341,8 +341,12 @@ class TimestamperSettingTab extends PluginSettingTab {
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.scrollToBottom)
                 .onChange(async (value) => {
+                    if (value) {
+                        this.plugin.settings.chainMode = false;
+                    }
                     this.plugin.settings.scrollToBottom = value;
                     await this.plugin.saveSettings();
+                    this.display();
                 }));
 
         new Setting(containerEl)
