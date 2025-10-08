@@ -367,6 +367,7 @@ class TimestamperSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     if (value) {
                         this.plugin.settings.insertAtEnd = false;
+                        this.plugin.settings.scrollToBottom = false;
                     }
                     this.plugin.settings.chainMode = value;
                     await this.plugin.saveSettings();
