@@ -4,7 +4,9 @@ const DEFAULT_SETTINGS = {
     autoOpenDailyNote: true,
     scrollToBottom: true,
     insertAtEnd: true,
-    timestampFormat: '# HH:MM'
+    chainMode: false,
+    timestampFormat: '# HH:MM',
+    separators: ''
 };
 
 module.exports = class TimestamperPlugin extends Plugin {
@@ -33,15 +35,8 @@ module.exports = class TimestamperPlugin extends Plugin {
     scrollToBottom(editor) {
         if (!editor || !this.settings.scrollToBottom) return;
 
-        const lastLine = editor.lineCount() - 1;
-        const lastChar = editor.getLine(lastLine).length;
-        editor.setCursor({ line: lastLine, ch: lastChar });
-
-        const codemirror = editor.cm;
-        if (codemirror && codemirror.scrollDOM) {
-            const scrollContainer = codemirror.scrollDOM;
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        }
+        const cursorPos = editor.getCursor();
+        editor.scrollIntoView(cursorPos);
     }
 
     getDailyNoteConfiguration() {
@@ -180,6 +175,63 @@ module.exports = class TimestamperPlugin extends Plugin {
         return totalLines;
     }
 
+    findLastTimestamp(editor) {
+        const totalLines = editor.lineCount();
+        const timestampPattern = this.settings.timestampFormat
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            .replace('HH', '\\d{2}')
+            .replace('MM', '\\d{2}');
+        const regex = new RegExp('^' + timestampPattern);
+
+        let lastTimestampLine = -1;
+
+        for (let i = 0; i < totalLines; i++) {
+            const line = editor.getLine(i);
+            if (regex.test(line.trim())) {
+                lastTimestampLine = i;
+            }
+        }
+
+        return lastTimestampLine;
+    }
+
+    getSeparatorList() {
+        if (!this.settings.separators || this.settings.separators.trim() === '') {
+            return [];
+        }
+        return this.settings.separators
+            .split(',')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+    }
+
+    isSeparatorLine(line) {
+        const separators = this.getSeparatorList();
+        if (separators.length === 0) return false;
+
+        const trimmedLine = line.trim();
+        return separators.some(sep => trimmedLine.startsWith(sep));
+    }
+
+    findContentEndAfterTimestamp(editor, timestampLine) {
+        const totalLines = editor.lineCount();
+        let lastContentLine = timestampLine;
+
+        for (let i = timestampLine + 1; i < totalLines; i++) {
+            const line = editor.getLine(i);
+
+            if (this.isSeparatorLine(line)) {
+                break;
+            }
+
+            if (line.trim() !== '') {
+                lastContentLine = i;
+            }
+        }
+
+        return lastContentLine;
+    }
+
     insertTimestamp(editor) {
         if (!editor) return;
 
@@ -191,11 +243,28 @@ module.exports = class TimestamperPlugin extends Plugin {
             .replace('HH', hours)
             .replace('MM', minutes);
 
-        if (this.settings.insertAtEnd) {
+        if (this.settings.chainMode) {
+            this.insertTimestampChain(editor, formattedTimestamp);
+        } else if (this.settings.insertAtEnd) {
             this.insertTimestampAtDocumentEnd(editor, formattedTimestamp);
         } else {
             this.insertTimestampAtCursorPosition(editor, formattedTimestamp);
         }
+    }
+
+    insertTimestampChain(editor, timestamp) {
+        const lastTimestampLine = this.findLastTimestamp(editor);
+
+        if (lastTimestampLine === -1) {
+            this.insertTimestampAtDocumentEnd(editor, timestamp);
+            return;
+        }
+
+        const contentEndLine = this.findContentEndAfterTimestamp(editor, lastTimestampLine);
+        const contentEndCol = editor.getLine(contentEndLine).length;
+
+        editor.replaceRange(`\n\n${timestamp}\n`, { line: contentEndLine, ch: contentEndCol });
+        editor.setCursor({ line: contentEndLine + 3, ch: 0 });
     }
 
     insertTimestampAtDocumentEnd(editor, timestamp) {
@@ -275,8 +344,26 @@ class TimestamperSettingTab extends PluginSettingTab {
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.insertAtEnd)
                 .onChange(async (value) => {
+                    if (value) {
+                        this.plugin.settings.chainMode = false;
+                    }
                     this.plugin.settings.insertAtEnd = value;
                     await this.plugin.saveSettings();
+                    this.display();
+                }));
+
+        new Setting(containerEl)
+            .setName('Chain mode')
+            .setDesc('Insert timestamp after the last timestamp and its content, before separators.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.chainMode)
+                .onChange(async (value) => {
+                    if (value) {
+                        this.plugin.settings.insertAtEnd = false;
+                    }
+                    this.plugin.settings.chainMode = value;
+                    await this.plugin.saveSettings();
+                    this.display();
                 }));
 
         new Setting(containerEl)
@@ -287,6 +374,17 @@ class TimestamperSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.timestampFormat)
                 .onChange(async (value) => {
                     this.plugin.settings.timestampFormat = value || '# HH:MM';
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Separators')
+            .setDesc('Comma-separated list of line prefixes that mark the end of content.')
+            .addText(text => text
+                .setPlaceholder('---,%%')
+                .setValue(this.plugin.settings.separators)
+                .onChange(async (value) => {
+                    this.plugin.settings.separators = value;
                     await this.plugin.saveSettings();
                 }));
     }
