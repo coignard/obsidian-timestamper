@@ -1,4 +1,4 @@
-const { Plugin, MarkdownView, PluginSettingTab, Setting } = require('obsidian');
+const { Plugin, MarkdownView, PluginSettingTab, Setting, moment, normalizePath } = require('obsidian');
 
 const DEFAULT_SETTINGS = {
     autoOpenDailyNote: true,
@@ -71,13 +71,13 @@ module.exports = class TimestamperPlugin extends Plugin {
         const dateFormat = config.format;
         const noteFolder = config.folder;
 
-        const today = window.moment();
+        const today = moment();
         const filename = today.format(dateFormat);
 
         if (noteFolder && noteFolder !== '/') {
-            return `${noteFolder}/${filename}.md`;
+            return normalizePath(`${noteFolder}/${filename}.md`);
         } else {
-            return `${filename}.md`;
+            return normalizePath(`${filename}.md`);
         }
     }
 
@@ -137,10 +137,7 @@ module.exports = class TimestamperPlugin extends Plugin {
             markdownView = await this.openTodaysDailyNote();
             if (!markdownView) return;
         } else {
-            const activeLeaf = this.app.workspace.activeLeaf;
-            if (!activeLeaf) return;
-
-            markdownView = activeLeaf.view instanceof MarkdownView ? activeLeaf.view : null;
+            markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (!markdownView) return;
         }
 
@@ -375,8 +372,8 @@ class TimestamperSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Timestamp format')
             .setDesc('Format for the timestamp. Use HH for hours and MM for minutes.')
-            .addText(text => text
-                .setPlaceholder('# HH:MM')
+            .addMomentFormat(format => format
+                .setDefaultFormat('# HH:MM')
                 .setValue(this.plugin.settings.timestampFormat)
                 .onChange(async (value) => {
                     this.plugin.settings.timestampFormat = value || '# HH:MM';

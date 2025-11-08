@@ -1,7 +1,7 @@
 {
     "id": "timestamper",
     "name": "Timestamper",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "minAppVersion": "1.18.10",
     "description": "Insert the current timestamp into your notes.",
     "author": "René Coignard",
